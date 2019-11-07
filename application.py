@@ -48,10 +48,11 @@ class Application:
 
         elif isinstance(current_scene, RunningScene):
             if going_forward:
-                pass  # go back to activities, clear all data
-                # necessary using auto.clear() or something
+                self.reset_scene(ActivitySelectScene, args=(
+                    self.root, self.auto, self.change_scene))
             else:
-                pass  # go back to options
+                self.reset_scene(OptionsScene,
+                                 args=(self.root, self.auto, self.change_scene))
 
 
 class LoginScene:
@@ -97,11 +98,13 @@ class LoginScene:
         bottom_frame = tk.Frame(self.root)
         bottom_frame.pack(fill='both', expand=1)
 
-        tk.Checkbutton(bottom_frame, text="Remember Login", font=self.default_font, var=self.remember_login
+        tk.Checkbutton(bottom_frame, text="Remember Login", 
+                       font=self.default_font, var=self.remember_login
                        ).pack(side='left', padx=10)
 
-        self.login_button = tk.Button(bottom_frame, text='Login', font=('Helvetica', 13), bg='gray85',
-                                      command=self.login)
+        self.login_button = tk.Button(bottom_frame, text='Login', 
+            font=('Helvetica', 13), bg='gray85', command=self.login)
+
         self.login_button.pack(side='right', ipadx=6, padx=10)
 
     def login(self, *args):
@@ -110,10 +113,12 @@ class LoginScene:
                 "Warning!", "The username or password can not be empty!")
         else:
             if self.thread is None:
-                self.thread = threading.Thread(target=self.auto.login, args=(self.username_entry.get(),
-                                                                             self.password_entry.get(),
-                                                                             self.login_result,
-                                                                             self.login_unsuccessful))
+                self.thread = threading.Thread(
+                    target=self.auto.login, 
+                    args=(self.username_entry.get(),
+                          self.password_entry.get(),
+                          self.login_result,
+                          self.login_unsuccessful))
                 self.thread.start()
 
     def save_login(self, username, password):
@@ -238,6 +243,8 @@ class OptionsScene:
         self.auto = auto
         self.change_scene = change_scene
 
+        self.loading = False
+
         tk.Label(self.root, text="Current Activity:",
                  font=("Helvetica", 16, 'bold'), relief='groove',
                  ).pack(fill='x', ipady=2)
@@ -327,7 +334,12 @@ class OptionsScene:
 
         threading.Thread(target=prep_and_change_scene).start()
 
+        self.loading = True
+
     def go_back(self):
+
+        if self.loading:
+            return
 
         self.auto.driver.back()
 
@@ -355,9 +367,13 @@ class RunningScene:
         self.auto = auto
         self.change_scene = change_scene
 
-        self.thread = threading.Thread(target=self.auto.activity_auto.run_automation,
-                                       args=(self.update,
-                                             RunningScene.failed))
+        def auto_func():
+            if not self.auto.activity_auto.run_automation(self.update):
+                RunningScene.failed()
+
+            self.finished()
+
+        self.thread = threading.Thread(target=auto_func)
         self.thread.start()
 
         tk.Label(self.root, text="Current Activity:",
@@ -399,6 +415,18 @@ class RunningScene:
         LabelDisplay(option_frame, 6, "Auto Submitting:",
                      value_width, data="Yes"
                      if self.auto.activity_auto.auto_submit else "No")
+        
+        buttons = tk.Frame(self.root)
+        buttons.pack(side='bottom', fill='x', padx=10, pady=10)
+
+        tk.Button(buttons, text="Back", font=("Helvetica", 14), bg='gray90',
+                  command=self.go_back
+                  ).pack(side='left')
+        
+        self.complete_button = tk.Button(buttons, text="Complete", 
+                  font=("Helvetica", 14), bg='gray90', 
+                  command=self.to_activities, state=tk.DISABLED)
+        self.complete_button.pack(side='right')
 
     def update(self, current_secs, current_mins,
                current_words, correct_words, current_percent):
@@ -409,6 +437,25 @@ class RunningScene:
 
         self.current_words_ld.update_data(f"{correct_words}/{current_words}")
         self.current_percent_ld.update_data(str(current_percent)+"%")
+
+    def finished(self):
+        self.complete_button.config(state=tk.NORMAL)
+
+    def go_back(self):
+        self.auto.driver.back()
+        self.change_scene(self, False)
+    
+    def to_activities(self):
+        if not self.auto.activity_auto.auto_submit:
+            response = messagebox.askyesno(
+                "Warning! Score not automatically submitted!",
+                "You must manually submit your score before you exit this activity! Would you still like to exit?")
+            
+            if not response:
+                return
+
+        self.auto.driver.get("https://conjuguemos.com/student/activities")
+        self.change_scene(self, True)
 
     @staticmethod
     def failed():

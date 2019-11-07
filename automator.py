@@ -1,8 +1,8 @@
 import time
 import os
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException, \
-    ElementClickInterceptedException, ElementNotInteractableException
+from selenium.common.exceptions import (NoSuchElementException,
+    ElementClickInterceptedException, ElementNotInteractableException)
 
 
 class ActivityOptions:
@@ -28,24 +28,98 @@ class ActivityAuto(ActivityOptions):
 
         self.driver = driver
         self.name = ""
-        self.last_action_time = 0.0
 
-        self.button_element = None
-        self.answer_element = None
-        self.question_index = 0
-        self.correct_questions = 0
-        self.wrong_questions = 0
+    def get_elements(self):
+        """ overrided by child classes """
+        raise NotImplementedError
+    
+    def get_answer(self, *args, **kwargs):
+        """ overrided by child classes """
+        raise NotImplementedError
 
-    def display_data(self, update_data, current_time,
-                     start_time, time_limit, question_index,
-                     correct_questions):
-        time_left = (60 * time_limit - int(current_time - start_time))
+    def try_submit(self):
+        try:
+            self.driver.find_element_by_xpath(
+                "//button[contains(text(), 'Record Score')]").click()
+            return True
+        except (NoSuchElementException, 
+                ElementClickInterceptedException, 
+                ElementClickInterceptedException):
+            return False
 
-        update_data(time_left % 60,
-                    int(time_left / 60),
-                    question_index,
-                    correct_questions,
-                    int(100 * correct_questions / question_index))
+    def check_finished(self):
+        try:
+            avg = self.driver.find_element_by_xpath(
+                    "//label[contains(text(), 'Avg Score')]")
+            return avg.is_displayed()
+        except NoSuchElementException:
+            return False
+
+    def run_automation(self, update_data):
+        question_index = 0
+
+        last_action_time = 0.0
+
+        try:
+            elements = self.get_elements()
+        except NoSuchElementException:
+            return False
+
+        start_time = time.time()
+
+        correct_questions = 0
+
+        answering_wrong = False
+
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - last_action_time
+            try:
+                last_action_time = time.time()
+
+                if (question_index < self.word_amount and
+                    elapsed_time >= self.speed):
+                    # Checks if percent would be lower than target
+                    # if answer is wrong.
+                    answering_wrong = (correct_questions / (question_index + 1)
+                        > self.target_percent/100.0)
+                    if answering_wrong:
+                        ans = f"wrong {question_index + 1}"
+                    else:
+                        ans = self.get_answer(**elements)
+
+                    elements['answer_element'].clear()
+                    elements['answer_element'].send_keys(ans)
+                    elements['button_element'].click()
+
+                    question_index += 1
+                    if not answering_wrong:
+                        correct_questions += 1
+
+                time_left = (60 * self.time_limit - int(current_time - start_time))
+
+                if time_left < 0:
+                    break
+
+                update_data(time_left % 60,
+                            int(time_left / 60),
+                            question_index,
+                            correct_questions,
+                            int(100 * correct_questions / question_index))
+                
+                time.sleep(0.05)
+
+            except (ElementClickInterceptedException,
+                    ElementNotInteractableException):
+                continue
+
+        if self.auto_submit:
+            while not self.check_finished():
+                pass 
+            while not self.try_submit():
+                pass
+
+        return True
 
 
 class VocabularyAuto(ActivityAuto):
@@ -54,51 +128,20 @@ class VocabularyAuto(ActivityAuto):
         self.vocab_dict = {}
         self.question_element = None
 
-    def run_automation(self, update_data, failed):
-        try:
-            self.question_element = self.driver.find_element_by_id(
-                "question-input")
-            self.button_element = self.driver.find_element_by_id(
-                "check-button")
-            self.answer_element = self.driver.find_element_by_id(
-                "answer-input")
-        except NoSuchElementException:
-            failed()
-            return
+    def get_elements(self):
+        elements = {}
 
-        start_time = time.time()
-
-        while True:
-            current_time = time.time()
-            elapsed_time = current_time - self.last_action_time
-
-            try:
-                self.last_action_time = time.time()
-
-                if (self.question_index < self.word_amount and
-                    elapsed_time >= self.speed):
-                    if self.question_index < self.wrong_questions:
-                        ans = f"wrong {self.question_index + 1}"
-                    else:
-                        ans = self.vocab_dict[self.question_element.text]
-                        self.correct_questions += 1
-
-                    self.answer_element.clear()
-                    self.answer_element.send_keys(ans)
-                    self.button_element.click()
-
-                    self.question_index += 1
-
-                self.display_data(update_data, current_time,
-                                  start_time, self.time_limit,
-                                  self.question_index, self.correct_questions)
-
-                time.sleep(0.05)
-
-            except ElementClickInterceptedException:
-                continue
-
-        return True
+        elements['question_element'] = self.driver.find_element_by_id(
+            "question-input")
+        elements['button_element'] = self.driver.find_element_by_id(
+            "check-button")
+        elements['answer_element'] = self.driver.find_element_by_id(
+            "answer-input")
+        
+        return elements
+    
+    def get_answer(self, **kwargs):
+        return self.vocab_dict[kwargs['question_element'].text]
 
     def load_data(self):
         table = self.driver.find_element_by_xpath(
@@ -124,57 +167,27 @@ class ConjugationAuto(ActivityAuto):
         self.pronoun_element = None
         self.verb_element = None
 
-    def run_automation(self, update_data, failed):
-        try:
-            self.pronoun_element = self.driver.find_element_by_id(
+    def get_elements(self):
+        elements = {}
+
+        elements['pronoun_element'] = self.driver.find_element_by_id(
                 "pronoun-input")
-            self.verb_element = self.driver.find_element_by_id(
-                "verb-input")
-            self.button_element = self.driver.find_element_by_id(
-                "check-button")
-            self.answer_element = self.driver.find_element_by_id(
-                "answer-input")
-        except NoSuchElementException:
-            failed()
-            return
-
-        start_time = time.time()
-
-        while True:
-            current_time = time.time()
-            elapsed_time = current_time - self.last_action_time
-            try:
-                self.last_action_time = time.time()
-
-                if (self.question_index < self.word_amount and
-                    elapsed_time >= self.speed):
-                    if self.question_index < self.wrong_questions:
-                        ans = f"wrong {self.question_index + 1}"
-                    else:
-                        verb = None
-                        for verb in self.verbs:
-                            if verb['verb'] == self.verb_element.text:
-                                break
-                        ans = verb[ConjugationAuto.get_pronoun(
-                            self.pronoun_element.text)]
-                        self.correct_questions += 1
-
-                    self.answer_element.clear()
-                    self.answer_element.send_keys(ans)
-                    self.button_element.click()
-
-                    self.question_index += 1
-
-                self.display_data(update_data, current_time,
-                                  start_time, self.time_limit,
-                                  self.question_index, self.correct_questions)
-                
-                time.sleep(0.05)
-
-            except ElementClickInterceptedException:
-                continue
-
-        return True
+        elements['verb_element'] = self.driver.find_element_by_id(
+            "verb-input")
+        elements['button_element'] = self.driver.find_element_by_id(
+            "check-button")
+        elements['answer_element'] = self.driver.find_element_by_id(
+            "answer-input")
+        
+        return elements
+    
+    def get_answer(self, **kwargs):
+        verb = None
+        for verb in self.verbs:
+            if verb['verb'] == kwargs['verb_element'].text:
+                break
+        return verb[ConjugationAuto.get_pronoun(
+            kwargs['pronoun_element'].text)]
 
     def load_data(self):
         table_elements = self.driver.find_elements_by_xpath(
@@ -216,12 +229,10 @@ class Automator:
 
     def __init__(self):
         self.driver = webdriver.Firefox(
-            executable_path=os.getcwd() + "\\res\\geckodriver.exe")
+            executable_path=os.getcwd() + "\\res\\geckodriver.exe",
+            service_log_path=os.path.devnull)
         self.driver.maximize_window()
         self.driver.get("https://conjuguemos.com/auth/login")
-
-        # self.driver.implicitly_wait(0) TODO: if something breaks,
-        #                                      this might be the reason
 
         self.options = None
 
@@ -311,10 +322,6 @@ class Automator:
 
     def prepare_start(self):
 
-        self.activity_auto.wrong_questions = \
-            int((1.0002 - self.activity_auto.target_percent/100) *
-                self.activity_auto.word_amount)
-        
         insertion_end = self.driver.current_url.rfind("/")
         insertion_pos = self.driver.current_url.rfind("/", insertion_end) + 1
 
