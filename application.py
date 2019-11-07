@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 import automator
+from cryptography.fernet import Fernet
 
 
 class Application:
@@ -91,8 +92,12 @@ class LoginScene:
         self.remember_login = tk.IntVar(0)
 
         if len(login_lines) > 1:
-            self.username_entry.insert('end', login_lines[0])
-            self.password_entry.insert('end', login_lines[1])
+            key = str.encode(login_lines[0])
+            cipher_suite = Fernet(key)
+            decoded_pass = cipher_suite.decrypt(str.encode(login_lines[2])).decode()
+
+            self.username_entry.insert('end', login_lines[1])
+            self.password_entry.insert('end', decoded_pass)
             self.remember_login.set(1)
 
         bottom_frame = tk.Frame(self.root)
@@ -124,7 +129,10 @@ class LoginScene:
     def save_login(self, username, password):
         with open("res/saved_login.txt", 'w') as f:
             if self.remember_login.get():
-                f.write(username + '\n' + password)
+                key = Fernet.generate_key().decode()
+                cipher_suite = Fernet(key)
+                encoded_pass = cipher_suite.encrypt(str.encode(password)).decode()
+                f.write(key + '\n' + username + '\n' + encoded_pass)
 
     def login_result(self, username, password, result):
         if result:
@@ -291,6 +299,10 @@ class OptionsScene:
                   ).pack(side='right')
 
     def set_values(self):
+
+        if self.loading:
+            return
+
         time_limit = self.timer.entry.get().replace("m", "").strip()
 
         word_amount = self.word_amount.entry.get()
