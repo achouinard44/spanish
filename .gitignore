@@ -3,6 +3,8 @@ geckodriver.log
 
 .vscode/
 
-.dist/
+/build/*
+
+/dist/*
 
 *.zip
