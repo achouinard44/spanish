@@ -75,10 +75,11 @@ class ActivityAuto(ActivityOptions):
             current_time = time.time()
             elapsed_time = current_time - last_action_time
             try:
-                last_action_time = time.time()
-
                 if (question_index < self.word_amount and
                     elapsed_time >= self.speed):
+
+                    last_action_time = time.time()
+
                     # Checks if percent would be lower than target
                     # if answer is wrong.
                     answering_wrong = (correct_questions / (question_index + 1)

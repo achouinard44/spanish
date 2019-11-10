@@ -2,3 +2,7 @@ geckodriver.log
 geckodriver.log
 
 .vscode/
+
+.dist/
+
+*.zip
