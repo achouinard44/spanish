@@ -1,12 +1,14 @@
 geckodriver.log
 geckodriver.log
 
-/.vscode/*
+.vscode/
 
-/__pycache__/*
+__pycache__/
 
-/build/*
+*.pyc
 
-/dist/*
+build/
+
+dist/
 
 *.zip
