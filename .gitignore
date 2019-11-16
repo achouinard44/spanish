@@ -1,7 +1,9 @@
 geckodriver.log
 geckodriver.log
 
-.vscode/
+/.vscode/*
+
+/__pycache__/*
 
 /build/*
 
