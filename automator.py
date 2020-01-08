@@ -322,7 +322,14 @@ class VocabularyAuto(ActivityAuto):
     def get_answer(self, **kwargs):
         """Gets the correct answer based on the activity question."""
 
-        return self.vocab_dict[kwargs['question_element'].text]
+        answer = self.vocab_dict[kwargs['question_element'].text]
+
+        # Only uses the first of multiple slash separated answers
+        slash_index = answer.find("/")
+        if slash_index != -1:
+            answer = answer[:slash_index]
+        
+        return answer
 
     def load_data(self):
         """Parses and saves the data from the vocabulary chart
