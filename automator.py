@@ -46,8 +46,8 @@ class Automator:
         """Attempts to login to conjuguemos.
         
         Returns:
-            `True` if login is successful, `False` otherwise.
-            `"timed out"` if the login timed out.
+            `1` if login is successful, `0` if login failed, and
+            `-1` if the login timed out.
         """
 
         username_element = self.driver.find_element_by_id("identity")
@@ -67,13 +67,13 @@ class Automator:
                 try:
                     self.driver.find_element_by_id("form_errors")
                     self.driver.get(self.driver.current_url)
-                    return False
+                    return 0
                 except NoSuchElementException:
                     pass
             else:
-                return True
+                return 1
 
-        return "timed out"
+        return -1
 
     def get_activities(self):
         """Returns a list of conjuguemos activities."""

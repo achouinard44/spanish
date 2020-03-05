@@ -186,10 +186,10 @@ class LoginScene:
                 username = self.username_entry.get()
                 password = self.password_entry.get()
                 result = self.auto.login(username, password)
-                if result is True:
+                if result == 1:
                     self.save_login(username, password)
                     self.change_scene(self, True)
-                elif result is False:
+                elif result == 0:
                     messagebox.showinfo(
                         "Warning!", 
                         "Username or password not accepted. Try again.")
