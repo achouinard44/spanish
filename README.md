@@ -2,7 +2,9 @@
 
 An application that automatically completes Spanish conjuguemos activities. You can specify the time, amount of words to complete, target score, and the speed at which the questions are automatically answered. As of now, you need a conjuguemos account to use the application because it only works with assigned activities.
 
-### Future Features:
+**Disclaimer:** This application is for demonstrational purposes only and is not meant to be used to submit actual assignments. Study your vocab!
+
+### Potential Future Features:
 
 * Ability to use app without account
 * Support for different languages
